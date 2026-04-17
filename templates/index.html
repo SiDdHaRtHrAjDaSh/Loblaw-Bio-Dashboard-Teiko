@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Loblaw Bio Trial Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Loblaw Bio Clinical Trial</p>
+        <h1>Immune Cell Analysis Dashboard</h1>
+        <p class="subtitle">
+          Summary metrics, statistical comparison, baseline subset analysis, schema design, and project walkthrough.
+        </p>
+      </div>
+
+      <div class="answer-card">
+        <div class="label">Answer</div>
+        <div class="answer-value">
+          {{ answer if answer else "Not available yet" }}
+        </div>
+        <div class="answer-caption">
+          Average B cells for melanoma male responders at time 0
+        </div>
+      </div>
+    </header>
+
+    <section class="top-actions">
+      <a class="button" href="{{ url_for('outputs', filename='summary_table.csv') }}">Download Summary Table</a>
+      <a class="button" href="{{ url_for('outputs', filename='summary_table_full.csv') }}">Download Full Summary Table</a>
+      <a class="button" href="{{ url_for('outputs', filename='response_stats.csv') }}">Download Stats Table</a>
+      <a class="button" href="{{ url_for('outputs', filename='baseline_subset.csv') }}">Download Baseline Subset</a>
+      <a class="button" href="{{ url_for('outputs', filename='report.txt') }}">Download Report</a>
+    </section>
+
+    <section class="grid-cards">
+      <div class="metric-card">
+        <div class="metric-label">Total rows</div>
+        <div class="metric-value">{{ total_rows }}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Unique samples</div>
+        <div class="metric-value">{{ unique_samples }}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Stats rows</div>
+        <div class="metric-value">{{ table_config.stats.preview_rows|length }}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Schema tables</div>
+        <div class="metric-value">4</div>
+      </div>
+    </section>
+
+    {% macro render_table_panel(table_id, table) -%}
+    <section class="panel table-panel">
+      <div class="section-head table-head">
+        <div>
+          <h2>{{ table.title }}</h2>
+          <p>Preview shows the first {{ table.preview_limit }} rows. Click to load the full table.</p>
+        </div>
+        <button
+          class="toggle-button"
+          type="button"
+          data-table-button="{{ table_id }}"
+          data-expanded="false"
+        >
+          Show full table
+        </button>
+      </div>
+
+      <div class="table-wrap collapsed" id="{{ table_id }}-wrap">
+        <table id="{{ table_id }}-table">
+          <thead>
+            <tr>
+              {% for col in table.columns %}
+                <th>{{ col }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody id="{{ table_id }}-body">
+            {% for row in table.preview_rows %}
+              <tr>
+                {% for col in table.columns %}
+                  <td>{{ row[col] if row[col] is not none else "" }}</td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {%- endmacro %}
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>Response comparison boxplot</h2>
+        <p>Melanoma PBMC samples on miraclib, responders versus non-responders.</p>
+      </div>
+
+      {% if has_plot %}
+        <img class="plot" src="{{ url_for('static', filename='response_boxplot.png') }}" alt="Response comparison boxplot">
+      {% else %}
+        <div class="empty-state">Plot not found yet. Run the pipeline first.</div>
+      {% endif %}
+    </section>
+
+    {{ render_table_panel("stats", table_config.stats) }}
+
+    {{ render_table_panel("subset", table_config.subset) }}
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>Schema design</h2>
+        <p>projects → patients → samples → cell_counts</p>
+      </div>
+
+      <div class="schema-legend">
+        {% for rel in relationships %}
+          <span class="pill">{{ rel }}</span>
+        {% endfor %}
+      </div>
+
+      <div class="schema-flow">
+        {% for table in schema %}
+          <div class="schema-card">
+            <div class="schema-title">{{ table.title }}</div>
+            <div class="schema-note">{{ table.note }}</div>
+            <ul class="schema-columns">
+              {% for col in table.columns %}
+                <li>{{ col }}</li>
+              {% endfor %}
+            </ul>
+            {% if table.fk %}
+              <div class="schema-fk">{{ table.fk }}</div>
+            {% endif %}
+          </div>
+
+          {% if not loop.last %}
+            <div class="schema-arrow">→</div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>How the project was built</h2>
+        <p>From schema design to final dashboard.</p>
+      </div>
+
+      <div class="story-grid">
+        {% for item in project_story %}
+          <div class="story-card">
+            <h3>{{ item.title }}</h3>
+            <p>{{ item.text }}</p>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>Generated report</h2>
+        <p>Pipeline output written to outputs/report.txt</p>
+      </div>
+
+      <pre class="report-box">{{ report_text }}</pre>
+    </section>
+
+    {{ render_table_panel("summary", table_config.summary) }}
+  </div>
+
+  <script>
+    const TABLE_CONFIG = {{ table_config | tojson }};
+
+    function buildTableHTML(columns, rows) {
+      const thead = `<thead><tr>${columns.map(col => `<th>${escapeHtml(String(col))}</th>`).join("")}</tr></thead>`;
+      const tbodyRows = rows.map(row => {
+        const cells = columns.map(col => `<td>${escapeHtml(formatCell(row[col]))}</td>`).join("");
+        return `<tr>${cells}</tr>`;
+      }).join("");
+      const tbody = `<tbody>${tbodyRows}</tbody>`;
+      return thead + tbody;
+    }
+
+    function formatCell(value) {
+      if (value === null || value === undefined) {
+        return "";
+      }
+      return value;
+    }
+
+    function escapeHtml(text) {
+      return text
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    async function toggleTable(tableId) {
+      const cfg = TABLE_CONFIG[tableId];
+      const button = document.querySelector(`[data-table-button="${tableId}"]`);
+      const wrap = document.getElementById(`${tableId}-wrap`);
+      const table = document.getElementById(`${tableId}-table`);
+      const body = document.getElementById(`${tableId}-body`);
+
+      const expanded = button.dataset.expanded === "true";
+
+      if (expanded) {
+        body.innerHTML = cfg.preview_rows.map(row => {
+          const cells = cfg.columns.map(col => `<td>${escapeHtml(formatCell(row[col]))}</td>`).join("");
+          return `<tr>${cells}</tr>`;
+        }).join("");
+        wrap.classList.remove("expanded");
+        wrap.classList.add("collapsed");
+        button.textContent = "Show full table";
+        button.dataset.expanded = "false";
+        return;
+      }
+
+      button.textContent = "Loading...";
+      button.disabled = true;
+
+      try {
+        const response = await fetch(cfg.endpoint);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch ${tableId} table`);
+        }
+        const data = await response.json();
+
+        table.innerHTML = buildTableHTML(data.columns, data.rows);
+
+        wrap.classList.remove("collapsed");
+        wrap.classList.add("expanded");
+        button.textContent = "Show preview";
+        button.dataset.expanded = "true";
+      } catch (error) {
+        console.error(error);
+        button.textContent = "Show full table";
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    document.querySelectorAll("[data-table-button]").forEach(button => {
+      button.addEventListener("click", () => {
+        toggleTable(button.dataset.tableButton);
+      });
+    });
+  </script>
+</body>
+</html>

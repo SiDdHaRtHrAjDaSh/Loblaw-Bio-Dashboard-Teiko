@@ -1,0 +1,76 @@
+# =========================
+# Virtual Environments
+# =========================
+.venv/
+venv/
+env/
+ENV/
+
+# =========================
+# Python Cache
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.py[cod]
+*$py.class
+
+# =========================
+# Jupyter Notebooks
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# Environment Variables
+# =========================
+.env
+.env.*
+*.env
+
+# =========================
+# SQLite / Database Files
+# =========================
+*.db
+*.sqlite3
+*.sqlite
+loblaw_bio_trial.db
+
+# =========================
+# Output / Generated Files
+# =========================
+outputs/
+static/response_boxplot.png
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# IDE / Editor Settings
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# Python Packaging
+# =========================
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# =========================
+# Temporary Files
+# =========================
+*.tmp
+*.temp
