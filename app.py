@@ -10,6 +10,8 @@ ROOT = Path(__file__).resolve().parent
 OUTPUTS = ROOT / "outputs"
 STATIC_DIR = ROOT / "static"
 
+POPULATIONS = ["b_cell", "cd8_t_cell", "cd4_t_cell", "nk_cell", "monocyte"]
+
 app = Flask(
     __name__,
     template_folder=str(ROOT / "templates"),
@@ -61,15 +63,30 @@ def _prepare_table(df: pd.DataFrame, limit: int | None = None) -> tuple[list[str
 
 def _load_table_from_disk(table_name: str) -> pd.DataFrame:
     spec = TABLE_SPECS.get(table_name)
-    if spec is None:
+    if spec is not None:
+        return _read_csv_if_exists(OUTPUTS / spec["filename"])
+    elif table_name.startswith("subset_"):
+        # Handle subset tables for different sample types
+        sample_type = table_name.split("_", 1)[1].upper()
+        filename = f"baseline_subset_{sample_type.lower()}.csv"
+        return _read_csv_if_exists(OUTPUTS / filename)
+    else:
         raise KeyError(table_name)
-    return _read_csv_if_exists(OUTPUTS / spec["filename"])
 
 
 def load_page_data() -> dict:
     summary_df = _load_table_from_disk("summary")
     stats_df = _load_table_from_disk("stats")
-    subset_df = _load_table_from_disk("subset")
+    
+    # Load subset data for different sample types
+    subset_dfs = {}
+    sample_types = ['PBMC', 'WB']
+    for sample_type in sample_types:
+        filename = f"baseline_subset_{sample_type.lower()}.csv"
+        if (OUTPUTS / filename).exists():
+            subset_dfs[sample_type] = pd.read_csv(OUTPUTS / filename)
+        else:
+            subset_dfs[sample_type] = pd.DataFrame()
 
     report_path = OUTPUTS / "report.txt"
     report_text = report_path.read_text(encoding="utf-8") if report_path.exists() else ""
@@ -83,7 +100,25 @@ def load_page_data() -> dict:
 
     summary_columns, summary_preview = _prepare_table(summary_df, TABLE_SPECS["summary"]["preview_limit"])
     stats_columns, stats_preview = _prepare_table(stats_df, TABLE_SPECS["stats"]["preview_limit"])
-    subset_columns, subset_preview = _prepare_table(subset_df, TABLE_SPECS["subset"]["preview_limit"])
+    
+    # Create table configs for each subset
+    subset_table_configs = {}
+    for sample_type, df in subset_dfs.items():
+        columns, preview = _prepare_table(df, 10)  # Preview limit of 10
+        subset_table_configs[sample_type] = {
+            "title": f"Baseline subset - {sample_type}",
+            "endpoint": f"/api/table/subset_{sample_type.lower()}",
+            "columns": columns,
+            "preview_rows": preview,
+            "preview_limit": 10,
+        }
+
+    # Prepare chart data for stats
+    chart_data = {
+        "labels": stats_df["population"].tolist() if not stats_df.empty else [],
+        "responders": stats_df["responders_mean_pct"].tolist() if not stats_df.empty else [],
+        "non_responders": stats_df["non_responders_mean_pct"].tolist() if not stats_df.empty else [],
+    }
 
     schema = [
         {
@@ -158,26 +193,26 @@ def load_page_data() -> dict:
     table_config = {
         "summary": {
             "title": TABLE_SPECS["summary"]["title"],
-            "endpoint": url_for("api_table", table_name="summary"),
+            "endpoint": "/api/table/summary",
+            "download_url": url_for("outputs", filename=TABLE_SPECS["summary"]["filename"]),
             "columns": summary_columns,
             "preview_rows": summary_preview,
             "preview_limit": TABLE_SPECS["summary"]["preview_limit"],
         },
         "stats": {
             "title": TABLE_SPECS["stats"]["title"],
-            "endpoint": url_for("api_table", table_name="stats"),
+            "endpoint": "/api/table/stats",
+            "download_url": url_for("outputs", filename=TABLE_SPECS["stats"]["filename"]),
             "columns": stats_columns,
             "preview_rows": stats_preview,
             "preview_limit": TABLE_SPECS["stats"]["preview_limit"],
         },
-        "subset": {
-            "title": TABLE_SPECS["subset"]["title"],
-            "endpoint": url_for("api_table", table_name="subset"),
-            "columns": subset_columns,
-            "preview_rows": subset_preview,
-            "preview_limit": TABLE_SPECS["subset"]["preview_limit"],
-        },
     }
+    
+    # Add subset configs for each sample type
+    for sample_type, config in subset_table_configs.items():
+        config["download_url"] = url_for("outputs", filename=f"baseline_subset_{sample_type.lower()}.csv")
+        table_config[f"subset_{sample_type.lower()}"] = config
 
     return {
         "answer": answer,
@@ -185,10 +220,11 @@ def load_page_data() -> dict:
         "schema": schema,
         "relationships": relationships,
         "table_config": table_config,
-        "has_plot": (STATIC_DIR / "response_boxplot.png").exists(),
+        "available_plots": [pop for pop in POPULATIONS if (STATIC_DIR / f"{pop}_boxplot.png").exists()],
         "total_rows": total_rows,
         "unique_samples": unique_samples,
         "project_story": project_story,
+        "chart_data": chart_data,
     }
 
 
@@ -199,12 +235,12 @@ def index():
 
 @app.route("/api/table/<table_name>")
 def api_table(table_name: str):
-    if table_name not in TABLE_SPECS:
+    try:
+        df = _load_table_from_disk(table_name)
+        columns, rows = _prepare_table(df, None)
+        return jsonify({"columns": columns, "rows": rows})
+    except KeyError:
         return jsonify({"error": "Unknown table"}), 404
-
-    df = _load_table_from_disk(table_name)
-    columns, rows = _prepare_table(df, None)
-    return jsonify({"columns": columns, "rows": rows})
 
 
 @app.route("/outputs/<path:filename>")

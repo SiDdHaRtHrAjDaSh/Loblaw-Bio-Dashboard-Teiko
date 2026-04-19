@@ -74,7 +74,10 @@ h1 {
   font-size: 1.8rem;
   font-weight: 800;
   margin: 8px 0;
-  color: var(--accent-2);
+  background: linear-gradient(135deg, #34d399, #60a5fa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .answer-caption {
@@ -100,6 +103,12 @@ h1 {
   padding: 10px 14px;
   font-weight: 600;
   border: 1px solid rgba(255,255,255,0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
 }
 
 .grid-cards {
@@ -115,6 +124,13 @@ h1 {
   border: 1px solid var(--border);
   border-radius: 20px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.14);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.metric-card:hover,
+.panel:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
 }
 
 .metric-card {
@@ -125,6 +141,10 @@ h1 {
   font-size: 2rem;
   font-weight: 800;
   margin-top: 8px;
+  background: linear-gradient(135deg, #60a5fa, #34d399);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .panel {
@@ -165,12 +185,85 @@ h1 {
   background: rgba(96, 165, 250, 0.18);
 }
 
+.chart-canvas {
+  max-width: 100%;
+  height: auto;
+  margin-top: 18px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.8);
+  padding: 10px;
+}
+
+.plot-slider {
+  margin-top: 18px;
+}
+
+.plot-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.plot-button {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  background: rgba(96, 165, 250, 0.12);
+  color: #dbeafe;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s ease;
+}
+
+.plot-button:hover,
+.plot-button.active {
+  background: rgba(96, 165, 250, 0.25);
+}
+
+.plot-container {
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.8);
+  padding: 10px;
+  overflow: hidden;
+}
+
 .plot {
   width: 100%;
   border-radius: 14px;
-  margin-top: 18px;
-  border: 1px solid var(--border);
   background: #fff;
+}
+
+.table-slider {
+  margin-top: 18px;
+}
+
+.table-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.table-button {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  background: rgba(96, 165, 250, 0.12);
+  color: #dbeafe;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s ease;
+}
+
+.table-button:hover,
+.table-button.active {
+  background: rgba(96, 165, 250, 0.25);
+}
+
+.table-container {
+  /* Container for the table content */
 }
 
 .table-wrap {

@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Loblaw Bio Trial Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
@@ -27,14 +28,6 @@
         </div>
       </div>
     </header>
-
-    <section class="top-actions">
-      <a class="button" href="{{ url_for('outputs', filename='summary_table.csv') }}">Download Summary Table</a>
-      <a class="button" href="{{ url_for('outputs', filename='summary_table_full.csv') }}">Download Full Summary Table</a>
-      <a class="button" href="{{ url_for('outputs', filename='response_stats.csv') }}">Download Stats Table</a>
-      <a class="button" href="{{ url_for('outputs', filename='baseline_subset.csv') }}">Download Baseline Subset</a>
-      <a class="button" href="{{ url_for('outputs', filename='report.txt') }}">Download Report</a>
-    </section>
 
     <section class="grid-cards">
       <div class="metric-card">
@@ -60,16 +53,11 @@
       <div class="section-head table-head">
         <div>
           <h2>{{ table.title }}</h2>
-          <p>Preview shows the first {{ table.preview_limit }} rows. Click to load the full table.</p>
+          <p>Preview shows the first {{ table.preview_limit }} rows. Download the full table below.</p>
         </div>
-        <button
-          class="toggle-button"
-          type="button"
-          data-table-button="{{ table_id }}"
-          data-expanded="false"
-        >
-          Show full table
-        </button>
+        <a class="button" href="{{ table.download_url }}" download>
+          Download table
+        </a>
       </div>
 
       <div class="table-wrap collapsed" id="{{ table_id }}-wrap">
@@ -97,20 +85,63 @@
 
     <section class="panel">
       <div class="section-head">
-        <h2>Response comparison boxplot</h2>
+        <h2>Response comparison boxplots</h2>
         <p>Melanoma PBMC samples on miraclib, responders versus non-responders.</p>
       </div>
 
-      {% if has_plot %}
-        <img class="plot" src="{{ url_for('static', filename='response_boxplot.png') }}" alt="Response comparison boxplot">
+      {% if available_plots %}
+        <div class="plot-slider">
+          <div class="plot-buttons">
+            {% for pop in available_plots %}
+              <button class="plot-button" data-plot="{{ pop }}">{{ pop.replace('_', ' ').title() }}</button>
+            {% endfor %}
+          </div>
+          <div class="plot-container">
+            <img id="current-plot" class="plot" src="{{ url_for('static', filename=available_plots[0] + '_boxplot.png') }}" alt="Boxplot">
+          </div>
+        </div>
       {% else %}
-        <div class="empty-state">Plot not found yet. Run the pipeline first.</div>
+        <div class="empty-state">Plots not found yet. Run the pipeline first.</div>
       {% endif %}
     </section>
 
     {{ render_table_panel("stats", table_config.stats) }}
 
-    {{ render_table_panel("subset", table_config.subset) }}
+    <section class="panel">
+      <div class="section-head">
+        <h2>Cell Population Comparison</h2>
+        <p>Mean percentages for responders vs non-responders</p>
+      </div>
+      <canvas id="statsChart" class="chart-canvas" width="400" height="200"></canvas>
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>Baseline Subset Analysis</h2>
+        <p>Melanoma miraclib samples at time 0 for different sample types</p>
+      </div>
+
+      {% set available_subsets = ['PBMC', 'WB'] %}
+      {% if available_subsets %}
+        <div class="table-slider">
+          <div class="table-buttons">
+            {% for sample_type in available_subsets %}
+              <button class="table-button" data-table="{{ sample_type.lower() }}">{{ sample_type }}</button>
+            {% endfor %}
+          </div>
+          <div class="table-container">
+            <div id="table-pbmc" class="subset-panel">
+              {{ render_table_panel("subset_pbmc", table_config.subset_pbmc) }}
+            </div>
+            <div id="table-wb" class="subset-panel" style="display: none;">
+              {{ render_table_panel("subset_wb", table_config.subset_wb) }}
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div class="empty-state">Subset data not found yet. Run the pipeline first.</div>
+      {% endif %}
+    </section>
 
     <section class="panel">
       <div class="section-head">
@@ -176,14 +207,47 @@
 
   <script>
     const TABLE_CONFIG = {{ table_config | tojson }};
+    const CHART_DATA = {{ chart_data | tojson }};
 
-    function buildTableHTML(columns, rows) {
+    // Create stats chart if Chart.js loaded
+    const statsChartElement = document.getElementById('statsChart');
+    if (typeof Chart !== 'undefined' && statsChartElement) {
+      const ctx = statsChartElement.getContext('2d');
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: CHART_DATA.labels,
+          datasets: [{
+            label: 'Responders Mean %',
+            data: CHART_DATA.responders,
+            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+          }, {
+            label: 'Non-Responders Mean %',
+            data: CHART_DATA.non_responders,
+            backgroundColor: 'rgba(255, 99, 132, 0.6)',
+            borderColor: 'rgba(255, 99, 132, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+
+    function buildTableHTML(columns, rows, bodyId) {
       const thead = `<thead><tr>${columns.map(col => `<th>${escapeHtml(String(col))}</th>`).join("")}</tr></thead>`;
       const tbodyRows = rows.map(row => {
         const cells = columns.map(col => `<td>${escapeHtml(formatCell(row[col]))}</td>`).join("");
         return `<tr>${cells}</tr>`;
       }).join("");
-      const tbody = `<tbody>${tbodyRows}</tbody>`;
+      const tbody = `<tbody id="${bodyId}">${tbodyRows}</tbody>`;
       return thead + tbody;
     }
 
@@ -213,10 +277,7 @@
       const expanded = button.dataset.expanded === "true";
 
       if (expanded) {
-        body.innerHTML = cfg.preview_rows.map(row => {
-          const cells = cfg.columns.map(col => `<td>${escapeHtml(formatCell(row[col]))}</td>`).join("");
-          return `<tr>${cells}</tr>`;
-        }).join("");
+        table.innerHTML = buildTableHTML(cfg.columns, cfg.preview_rows, `${tableId}-body`);
         wrap.classList.remove("expanded");
         wrap.classList.add("collapsed");
         button.textContent = "Show full table";
@@ -234,7 +295,7 @@
         }
         const data = await response.json();
 
-        table.innerHTML = buildTableHTML(data.columns, data.rows);
+        table.innerHTML = buildTableHTML(data.columns, data.rows, `${tableId}-body`);
 
         wrap.classList.remove("collapsed");
         wrap.classList.add("expanded");
@@ -253,6 +314,46 @@
         toggleTable(button.dataset.tableButton);
       });
     });
+
+    // Plot slider
+    const plotButtons = document.querySelectorAll('.plot-button');
+    const currentPlot = document.getElementById('current-plot');
+    plotButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        plotButtons.forEach(btn => btn.classList.remove('active'));
+        button.classList.add('active');
+        const plotName = button.dataset.plot;
+        currentPlot.src = `{{ url_for('static', filename='') }}/${plotName}_boxplot.png`;
+      });
+    });
+    // Set first button as active
+    if (plotButtons.length > 0) {
+      plotButtons[0].classList.add('active');
+    }
+
+    // Table slider
+    const tableButtons = document.querySelectorAll('.table-button');
+    const tablePanels = document.querySelectorAll('.subset-panel');
+    tableButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        tableButtons.forEach(btn => btn.classList.remove('active'));
+        button.classList.add('active');
+        const tableType = button.dataset.table;
+        
+        // Hide all table panels
+        tablePanels.forEach(panel => panel.style.display = 'none');
+        
+        // Show the selected table panel
+        const selectedPanel = document.getElementById(`table-${tableType}`);
+        if (selectedPanel) {
+          selectedPanel.style.display = 'block';
+        }
+      });
+    });
+    // Set first button as active
+    if (tableButtons.length > 0) {
+      tableButtons[0].classList.add('active');
+    }
   </script>
 </body>
 </html>

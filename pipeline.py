@@ -152,72 +152,92 @@ def run_population_stats(relative_df: pd.DataFrame) -> pd.DataFrame:
     return stats
 
 
-def create_boxplot(relative_df: pd.DataFrame, out_path: Path) -> None:
-    """Plot population relative frequencies for responders vs non-responders."""
+def create_boxplots(relative_df: pd.DataFrame, out_dir: Path) -> None:
+    """Plot population relative frequencies for responders vs non-responders, one per population."""
     subset = _response_subset(relative_df)
 
-    fig, axes = plt.subplots(1, len(POPULATIONS), figsize=(18, 4), sharey=True)
-    if len(POPULATIONS) == 1:
-        axes = [axes]
+    for population in POPULATIONS:
+        # Create figure with dark theme
+        fig, ax = plt.subplots(figsize=(5, 3.5), facecolor='#0f172a')
+        ax.set_facecolor('#1f2937')
 
-    for ax, population in zip(axes, POPULATIONS):
         pop_df = subset[subset["population"] == population]
         yes = pop_df.loc[pop_df["response"] == "yes", "percentage"].to_numpy()
         no = pop_df.loc[pop_df["response"] == "no", "percentage"].to_numpy()
 
-        ax.boxplot([yes, no], labels=["Responder", "Non-responder"], showfliers=False)
-        ax.set_title(population)
-        ax.tick_params(axis="x", rotation=20)
+        # Create boxplot with custom colors for dark theme
+        bp = ax.boxplot([yes, no], tick_labels=["Responder", "Non-responder"], showfliers=False,
+                       patch_artist=True,
+                       boxprops=dict(facecolor='#60a5fa', color='#60a5fa'),
+                       capprops=dict(color='#60a5fa'),
+                       whiskerprops=dict(color='#60a5fa'),
+                       flierprops=dict(color='#60a5fa', markeredgecolor='#60a5fa'),
+                       medianprops=dict(color='#34d399'))
 
-    axes[0].set_ylabel("Relative frequency (%)")
-    fig.suptitle("Melanoma PBMC samples on miraclib: relative frequencies by response")
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=200, bbox_inches="tight")
-    plt.close(fig)
+        ax.set_title(f"{population.replace('_', ' ').title()} - Melanoma PBMC on Miraclib",
+                    color='#e5e7eb', fontsize=11)
+        ax.set_ylabel("Relative frequency (%)", color='#e5e7eb')
+        ax.tick_params(axis='x', rotation=20, colors='#e5e7eb')
+        ax.tick_params(axis='y', colors='#e5e7eb')
+
+        # Set spine colors
+        for spine in ax.spines.values():
+            spine.set_edgecolor('#334155')
+
+        fig.tight_layout()
+        fig.savefig(out_dir / f"{population}_boxplot.png", dpi=200, bbox_inches="tight",
+                   facecolor=fig.get_facecolor())
+        plt.close(fig)
 
 
-def run_subset_analysis(conn: sqlite3.Connection) -> pd.DataFrame:
+def run_subset_analyses(conn: sqlite3.Connection) -> dict[str, pd.DataFrame]:
     """
-    Find melanoma PBMC baseline samples at time 0 from miraclib-treated patients.
-    Returns one row per sample with aggregated population counts.
+    Find melanoma baseline samples at time 0 from miraclib-treated patients for all sample types.
+    Returns a dict of DataFrames, one per sample type, with aggregated population counts.
     """
-    query = """
-        SELECT
-            pr.project_code AS project,
-            pa.subject_code AS subject,
-            pa.sex,
-            pa.age,
-            s.sample_id AS sample,
-            s.response,
-            s.treatment,
-            s.sample_type,
-            s.time_from_treatment_start,
-            SUM(CASE WHEN c.population = 'b_cell' THEN c.count ELSE 0 END) AS b_cell,
-            SUM(CASE WHEN c.population = 'cd8_t_cell' THEN c.count ELSE 0 END) AS cd8_t_cell,
-            SUM(CASE WHEN c.population = 'cd4_t_cell' THEN c.count ELSE 0 END) AS cd4_t_cell,
-            SUM(CASE WHEN c.population = 'nk_cell' THEN c.count ELSE 0 END) AS nk_cell,
-            SUM(CASE WHEN c.population = 'monocyte' THEN c.count ELSE 0 END) AS monocyte
-        FROM samples s
-        JOIN patients pa ON pa.patient_id = s.patient_id
-        JOIN projects pr ON pr.project_id = pa.project_id
-        JOIN cell_counts c ON c.sample_id = s.sample_id
-        WHERE LOWER(s.condition) = 'melanoma'
-          AND UPPER(s.sample_type) = 'PBMC'
-          AND LOWER(s.treatment) = 'miraclib'
-          AND s.time_from_treatment_start = 0
-        GROUP BY
-            pr.project_code,
-            pa.subject_code,
-            pa.sex,
-            pa.age,
-            s.sample_id,
-            s.response,
-            s.treatment,
-            s.sample_type,
-            s.time_from_treatment_start
-        ORDER BY pr.project_code, pa.subject_code, s.sample_id
-    """
-    return pd.read_sql_query(query, conn)
+    sample_types = ['PBMC', 'WB']
+    results = {}
+    
+    for sample_type in sample_types:
+        query = f"""
+            SELECT
+                pr.project_code AS project,
+                pa.subject_code AS subject,
+                pa.sex,
+                pa.age,
+                s.sample_id AS sample,
+                s.response,
+                s.treatment,
+                s.sample_type,
+                s.time_from_treatment_start,
+                SUM(CASE WHEN c.population = 'b_cell' THEN c.count ELSE 0 END) AS b_cell,
+                SUM(CASE WHEN c.population = 'cd8_t_cell' THEN c.count ELSE 0 END) AS cd8_t_cell,
+                SUM(CASE WHEN c.population = 'cd4_t_cell' THEN c.count ELSE 0 END) AS cd4_t_cell,
+                SUM(CASE WHEN c.population = 'nk_cell' THEN c.count ELSE 0 END) AS nk_cell,
+                SUM(CASE WHEN c.population = 'monocyte' THEN c.count ELSE 0 END) AS monocyte
+            FROM samples s
+            JOIN patients pa ON pa.patient_id = s.patient_id
+            JOIN projects pr ON pr.project_id = pa.project_id
+            JOIN cell_counts c ON c.sample_id = s.sample_id
+            WHERE LOWER(s.condition) = 'melanoma'
+              AND UPPER(s.sample_type) = '{sample_type}'
+              AND LOWER(s.treatment) = 'miraclib'
+              AND s.time_from_treatment_start = 0
+            GROUP BY
+                pr.project_code,
+                pa.subject_code,
+                pa.sex,
+                pa.age,
+                s.sample_id,
+                s.response,
+                s.treatment,
+                s.sample_type,
+                s.time_from_treatment_start
+            ORDER BY pr.project_code, pa.subject_code, s.sample_id
+        """
+        results[sample_type] = pd.read_sql_query(query, conn)
+    
+    return results
 
 
 def answer_question(conn: sqlite3.Connection) -> float:
@@ -246,7 +266,7 @@ def write_outputs(
     summary_short: pd.DataFrame,
     summary_full: pd.DataFrame,
     stats_df: pd.DataFrame,
-    subset_df: pd.DataFrame,
+    subset_dfs: dict[str, pd.DataFrame],
     answer: float,
 ) -> None:
     """Persist analysis outputs for dashboarding and grading."""
@@ -256,28 +276,40 @@ def write_outputs(
     summary_short.to_csv(OUTPUTS / "summary_table.csv", index=False)
     summary_full.to_csv(OUTPUTS / "summary_table_full.csv", index=False)
     stats_df.to_csv(OUTPUTS / "response_stats.csv", index=False)
-    subset_df.to_csv(OUTPUTS / "baseline_subset.csv", index=False)
+    
+    # Save subset data for each sample type
+    for sample_type, df in subset_dfs.items():
+        df.to_csv(OUTPUTS / f"baseline_subset_{sample_type.lower()}.csv", index=False)
 
     plot_path = OUTPUTS / "response_boxplot.png"
-    create_boxplot(summary_full, plot_path)
-    shutil.copyfile(plot_path, STATIC_DIR / "response_boxplot.png")
+    create_boxplots(summary_full, STATIC_DIR)
+    # For backward compatibility, copy the first one or something, but since we're changing, remove the old
+    # shutil.copyfile(plot_path, STATIC_DIR / "response_boxplot.png")
 
-    subset_projects = subset_df.groupby("project")["sample"].nunique().to_dict()
-    subset_responses = subset_df.groupby("response")["subject"].nunique().to_dict()
-    subset_sex = subset_df.groupby("sex")["subject"].nunique().to_dict()
-
+    # Generate report for all sample types
     report_lines = [
         "Question answer summary:",
         f"Average B cells for melanoma male responders at time=0 (PBMC): {answer:.2f}",
         "",
-        "Baseline melanoma PBMC miraclib subset at time=0:",
-        f"Samples by project: {subset_projects}",
-        f"Distinct subjects by response: {subset_responses}",
-        f"Distinct subjects by sex: {subset_sex}",
-        "",
+    ]
+    
+    for sample_type, df in subset_dfs.items():
+        subset_projects = df.groupby("project")["sample"].nunique().to_dict()
+        subset_responses = df.groupby("response")["subject"].nunique().to_dict()
+        subset_sex = df.groupby("sex")["subject"].nunique().to_dict()
+        
+        report_lines.extend([
+            f"Baseline melanoma {sample_type} miraclib subset at time=0:",
+            f"Samples by project: {subset_projects}",
+            f"Distinct subjects by response: {subset_responses}",
+            f"Distinct subjects by sex: {subset_sex}",
+            "",
+        ])
+    
+    report_lines.extend([
         "Statistics note:",
         "Significance is assessed with Mann-Whitney U and Benjamini-Hochberg FDR correction.",
-    ]
+    ])
     (OUTPUTS / "report.txt").write_text("\n".join(report_lines) + "\n", encoding="utf-8")
 
 
@@ -286,10 +318,10 @@ def main() -> None:
         df = fetch_cell_data(conn)
         summary_short, summary_full = build_relative_frequency_table(df)
         stats_df = run_population_stats(summary_full)
-        subset_df = run_subset_analysis(conn)
+        subset_dfs = run_subset_analyses(conn)
         answer = answer_question(conn)
 
-    write_outputs(summary_short, summary_full, stats_df, subset_df, answer)
+    write_outputs(summary_short, summary_full, stats_df, subset_dfs, answer)
     print("Pipeline complete. Outputs written to outputs/")
 
 
