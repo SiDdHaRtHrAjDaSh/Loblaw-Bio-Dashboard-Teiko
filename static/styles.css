@@ -54,7 +54,11 @@ h1 {
   line-height: 1.6;
   margin-top: 10px;
 }
-
+.headline{
+  margin: 0 0 18px;
+  font-size: 1.25rem;
+  color: #dbeafe;
+}
 .answer-card {
   min-width: 320px;
   background: rgba(17, 24, 39, 0.95);
@@ -186,12 +190,17 @@ h1 {
 }
 
 .chart-canvas {
-  max-width: 100%;
-  height: auto;
+  display: block;
+  width: 100%;
+  min-height: 320px;
   margin-top: 18px;
   border-radius: 14px;
   background: rgba(15, 23, 42, 0.8);
   padding: 10px;
+}
+
+.response-rate-chart {
+  margin-top: 18px;
 }
 
 .plot-slider {
@@ -307,15 +316,50 @@ tbody tr:hover {
   background: rgba(96, 165, 250, 0.08);
 }
 
-.report-box {
-  margin: 18px 0 0;
-  padding: 16px;
-  background: #0f172a;
-  border-radius: 14px;
+.report-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.report-download {
+  margin-top: 4px;
+}
+
+.report-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.report-section {
+  background: rgba(15, 23, 42, 0.95);
   border: 1px solid var(--border);
-  overflow-x: auto;
-  white-space: pre-wrap;
+  border-radius: 18px;
+  padding: 18px;
+}
+
+.report-section h3 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  color: #60a5fa;
+}
+
+.report-lines p {
+  margin: 0 0 10px;
+  color: var(--text);
   line-height: 1.6;
+  font-size: 0.94rem;
+}
+
+.report-lines p:last-child {
+  margin-bottom: 0;
+}
+
+.report-box {
+  display: none;
 }
 
 .schema-legend {
@@ -387,11 +431,24 @@ tbody tr:hover {
   padding: 0 2px;
 }
 
-.story-grid {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.story-flow {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 18px;
   margin-top: 18px;
+}
+
+.story-step {
+  width: 100%;
+  position: relative;
+}
+
+.story-step-title {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #dbeafe;
 }
 
 .story-card {
@@ -407,10 +464,26 @@ tbody tr:hover {
   color: #dbeafe;
 }
 
-.story-card p {
+.story-card p,
+.story-step p {
   margin: 0;
   line-height: 1.6;
   color: var(--text);
+}
+
+.story-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: var(--accent);
+  min-width: 48px;
+}
+
+.story-card h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  color: #dbeafe;
 }
 
 .empty-state,
@@ -431,8 +504,8 @@ tbody tr:hover {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .story-grid {
-    grid-template-columns: 1fr;
+  .story-flow {
+    flex-direction: column;
   }
 
   .table-head {
@@ -445,7 +518,8 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 
-  .schema-arrow {
+  .schema-arrow,
+  .story-arrow {
     width: 100%;
     justify-content: center;
     transform: rotate(90deg);

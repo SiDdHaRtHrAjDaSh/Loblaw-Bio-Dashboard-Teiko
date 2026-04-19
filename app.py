@@ -90,6 +90,14 @@ def load_page_data() -> dict:
 
     report_path = OUTPUTS / "report.txt"
     report_text = report_path.read_text(encoding="utf-8") if report_path.exists() else ""
+    report_sections = []
+    if report_text:
+        for section in [s.strip() for s in report_text.split("\n\n") if s.strip()]:
+            lines = section.splitlines()
+            report_sections.append({
+                "title": lines[0],
+                "body": lines[1:] if len(lines) > 1 else [],
+            })
 
     answer = None
     if report_text:
@@ -119,6 +127,21 @@ def load_page_data() -> dict:
         "responders": stats_df["responders_mean_pct"].tolist() if not stats_df.empty else [],
         "non_responders": stats_df["non_responders_mean_pct"].tolist() if not stats_df.empty else [],
     }
+
+    # Prepare gauge data for response rates
+    gauge_data = []
+    if not stats_df.empty:
+        for _, row in stats_df.iterrows():
+            responders = int(row["n_responders"])
+            non_responders = int(row["n_non_responders"])
+            total = responders + non_responders
+            percent = float((responders / total) * 100) if total > 0 else 0.0
+            gauge_data.append({
+                "population": row["population"],
+                "responders": responders,
+                "non_responders": non_responders,
+                "percent_responders": percent,
+            })
 
     schema = [
         {
@@ -168,27 +191,27 @@ def load_page_data() -> dict:
     unique_samples = summary_df["sample"].nunique() if not summary_df.empty and "sample" in summary_df.columns else 0
 
     project_story = [
-        {
-            "title": "1. Broke the problem into a relational schema",
-            "text": "I modeled the dataset as projects → patients → samples → cell_counts so that project-level, patient-level, and sample-level information stay separate and easy to query.",
-        },
-        {
-            "title": "2. Built the SQLite loader",
-            "text": "I wrote load_data.py to recreate the database from scratch, insert each entity into the proper table, and preserve foreign-key relationships.",
-        },
-        {
-            "title": "3. Verified the database was lossless",
-            "text": "I reconstructed the CSV from the normalized tables and compared it against the original file to confirm that no data was lost or changed.",
-        },
-        {
-            "title": "4. Ran the analysis pipeline",
-            "text": "I computed per-sample relative frequencies, statistical tests for responders versus non-responders, and the baseline melanoma PBMC subset at time 0.",
-        },
-        {
-            "title": "5. Created the dashboard",
-            "text": "I built a Flask webpage that renders the outputs, shows the schema design, displays scrollable tables with preview/full toggle buttons, and presents the final answer in a single local dashboard.",
-        },
-    ]
+    {
+        "title": "1. Problem Decomposition into a Relational Schema",
+        "text": "The dataset is modeled as projects → patients → samples → cell_counts, ensuring that project-level, patient-level, and sample-level information remain distinct, normalized, and easily queryable.",
+    },
+    {
+        "title": "2. SQLite Data Loading Pipeline",
+        "text": "A data loading script (load_data.py) reconstructs the database from scratch, inserts records into appropriate tables, and maintains referential integrity through foreign-key relationships.",
+    },
+    {
+        "title": "3. Data Integrity and Lossless Verification",
+        "text": "The original dataset is reconstructed from the normalized tables and compared against the source CSV to confirm that no data is lost or altered during the transformation process.",
+    },
+    {
+        "title": "4. Analytical Pipeline Execution",
+        "text": "The pipeline computes per-sample relative frequencies, performs statistical comparisons between responders and non-responders, and extracts baseline melanoma PBMC subsets at time 0 for targeted analysis.",
+    },
+    {
+        "title": "5. Interactive Dashboard Development",
+        "text": "A Flask-based dashboard presents the results, including schema visualization, scrollable data tables with preview/full toggles, and consolidated outputs for intuitive exploration in a single local interface.",
+    },
+]
 
     table_config = {
         "summary": {
@@ -217,6 +240,8 @@ def load_page_data() -> dict:
     return {
         "answer": answer,
         "report_text": report_text,
+        "report_sections": report_sections,
+        "report_download_url": url_for("outputs", filename="report.txt") if report_path.exists() else None,
         "schema": schema,
         "relationships": relationships,
         "table_config": table_config,
@@ -225,6 +250,7 @@ def load_page_data() -> dict:
         "unique_samples": unique_samples,
         "project_story": project_story,
         "chart_data": chart_data,
+        "gauge_data": gauge_data,
     }
 
 
