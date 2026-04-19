@@ -19,7 +19,7 @@
       </div>
 
       <div class="answer-card">
-        <div class="label">Answer</div>
+        <div class="label">Answer to Forms Question</div>
         <div class="answer-value">
           {{ answer if answer else "Not available yet" }}
         </div>
@@ -31,19 +31,19 @@
 
     <section class="grid-cards">
       <div class="metric-card">
-        <div class="metric-label">Total rows</div>
+        <div class="metric-label">Total rows in summary table</div>
         <div class="metric-value">{{ total_rows }}</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">Unique samples</div>
+        <div class="metric-label">Total unique samples</div>
         <div class="metric-value">{{ unique_samples }}</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">Stats rows</div>
+        <div class="metric-label">Statistic points</div>
         <div class="metric-value">{{ table_config.stats.preview_rows|length }}</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">Schema tables</div>
+        <div class="metric-label">Number of Tables in Schema</div>
         <div class="metric-value">4</div>
       </div>
     </section>
