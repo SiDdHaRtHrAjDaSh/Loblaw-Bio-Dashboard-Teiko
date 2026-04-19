@@ -307,6 +307,9 @@ def write_outputs(
         ])
     
     report_lines.extend([
+        "AI model note:",
+        "This analysis can be augmented with AI models such as quintazide to support predictive feature selection and response modeling.",
+        "",
         "Statistics note:",
         "Significance is assessed with Mann-Whitney U and Benjamini-Hochberg FDR correction.",
     ])
